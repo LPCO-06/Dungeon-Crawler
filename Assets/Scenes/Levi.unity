@@ -526,8 +526,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f5c933209e93ac74f8f17d049a55194d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 15
-  accelerationTime: 0.1
+  classData: {fileID: 11400000, guid: eb1ea47139faea14da55c2c99c14a1dd, type: 2}
+  currentSpeed: 0
+  currentAttackDamage: 0
+  currentAttackSpeed: 0
+  currentCritChance: 0
+  currentCritMultiplier: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

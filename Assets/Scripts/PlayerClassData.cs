@@ -8,12 +8,16 @@ public class PlayerClassData : ScriptableObject
     [TextArea] public string description;
 
     [Header("Base Stats")]
-    public float maxHealth = 20f;
+    public float maxHealth = 80f;
+    public float currentHealth = 20f;
     public float moveSpeed = 10f;
 
     [Header("Combat Stats")]
     public float attackDamage = 10f;
-    public float attackSpeed = 1f;
-    [Range(0f, 100f)] public float critChance = 5f;
-    public float critMultiplier = 1.5f;
+
+    [Header("Default Loadout")]
+    public AbilityData primaryAbility;
+    public AbilityData secondaryAbility;
+    public AbilityData skill1Ability;
+    public AbilityData skill2Ability;
 }

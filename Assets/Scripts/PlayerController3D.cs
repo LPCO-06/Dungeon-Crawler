@@ -5,11 +5,9 @@ public class PlayerController3D : MonoBehaviour
 {
     [Header("Class Configuration")]
     public PlayerClassData classData;
+
     [HideInInspector] public float currentSpeed;
-    [HideInInspector] public float currentAttackDamage;
-    [HideInInspector] public float currentAttackSpeed;
-    [HideInInspector] public float currentCritChance;
-    [HideInInspector] public float currentCritMultiplier;
+    [HideInInspector] public float currentHealth;
 
     private CharacterController controller;
     private Vector3 currentVelocity;
@@ -22,18 +20,12 @@ public class PlayerController3D : MonoBehaviour
         if (classData != null)
         {
             currentSpeed = classData.moveSpeed;
-            currentAttackDamage = classData.attackDamage;
-            currentAttackSpeed = classData.attackSpeed;
-            currentCritChance = classData.critChance;
-            currentCritMultiplier = classData.critMultiplier;
+            currentHealth = classData.maxHealth;
         }
         else
         {
             currentSpeed = 10f;
-            currentAttackDamage = 20f;
-            currentAttackSpeed = 1f;
-            currentCritChance = 5f;
-            currentCritMultiplier = 1.5f;
+            currentHealth = 20f;
         }
     }
 
@@ -50,8 +42,14 @@ public class PlayerController3D : MonoBehaviour
         if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) moveX = 1f;
 
         Vector3 targetDirection = new Vector3(moveX, 0, moveZ).normalized;
-        Vector3 targetVelocity = targetDirection * currentSpeed;
 
+        if (targetDirection != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 15f * Time.deltaTime);
+        }
+
+        Vector3 targetVelocity = targetDirection * currentSpeed;
         currentVelocity = Vector3.SmoothDamp(currentVelocity, targetVelocity, ref smoothVelocity, 0.05f);
 
         controller.Move(currentVelocity * Time.deltaTime);

@@ -10,13 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5be5a89f706f5284bae1063af2464e88, type: 3}
-  m_Name: WolfClass
+  m_Name: MusketeerClass
   m_EditorClassIdentifier: 
   className: 
   description: 
   maxHealth: 20
+  currentHealth: 20
   moveSpeed: 10
   attackDamage: 20
-  attackSpeed: 1
-  critChance: 5
-  critMultiplier: 1.5
+  primaryAbility: {fileID: 11400000, guid: 65210adf3457b55469c5d83941d4b8fe, type: 2}
+  secondaryAbility: {fileID: 0}
+  skill1Ability: {fileID: 0}
+  skill2Ability: {fileID: 0}

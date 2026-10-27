@@ -15,9 +15,9 @@ MonoBehaviour:
   abilityName: 
   description: 
   abilityType: 0
-  cooldown: 0.1
+  cooldown: 2
   damageMultiplier: 1
-  rangeOrSpeed: 10
+  rangeOrSpeed: 50
   critChance: 5
   critMultiplier: 3
   abilityPrefab: {fileID: 4982340064766416242, guid: b5a4b3ab17335894a8e9595c83c0ce21, type: 3}

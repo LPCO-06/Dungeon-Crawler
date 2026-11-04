@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca3e9b8a39820804eb0ca558dd69123b, type: 3}
+  m_Name: DefaultSwordProfile
+  m_EditorClassIdentifier: 
+  weaponName: Sword & Shield
+  m1Damage: 12
+  m1Cooldown: 0.4
+  m1ForwardLunge: 6
+  m1KnockbackForce: 14
+  m1HitboxSize: {x: 3, y: 2, z: 2.5}
+  m1HitboxOffset: {x: 0, y: 0, z: 1.2}
+  m2Damage: 28
+  m2Cooldown: 1
+  m2ForwardLunge: 20
+  m2KnockbackForce: 30
+  m2HitboxSize: {x: 4, y: 2, z: 4}
+  m2HitboxOffset: {x: 0, y: 0, z: 2}

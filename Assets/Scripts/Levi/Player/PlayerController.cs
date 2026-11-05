@@ -1,7 +1,9 @@
 using UnityEngine;
+using UnityEngine.InputSystem; // Required for New Input System
+using Unity.Netcode;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 8.5f;
@@ -11,27 +13,51 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float gravity = -20f;
 
     private CharacterController controller;
-    private Camera mainCamera;
     private Vector3 currentVelocity;
     private Vector3 verticalVelocity;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
-        mainCamera = Camera.main;
     }
 
     private void Update()
     {
+        // Allow input if we own this object, or if testing locally without a network manager running
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && !IsOwner)
+            return;
+
         HandleMovement();
-        HandleMouseAim();
         HandleGravity();
+
+        Vector3 totalMovement = (currentVelocity + verticalVelocity) * Time.deltaTime;
+        controller.Move(totalMovement);
     }
 
     private void HandleMovement()
     {
-        float inputX = Input.GetAxisRaw("Horizontal");
-        float inputZ = Input.GetAxisRaw("Vertical");
+        float inputX = 0f;
+        float inputZ = 0f;
+
+        // Read Keyboard Input (WASD / Arrows)
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) inputX -= 1f;
+            if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) inputX += 1f;
+            if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) inputZ -= 1f;
+            if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) inputZ += 1f;
+        }
+
+        // Read Gamepad Left Stick Input (if connected)
+        if (Gamepad.current != null)
+        {
+            Vector2 stick = Gamepad.current.leftStick.ReadValue();
+            if (stick.sqrMagnitude > 0.01f)
+            {
+                inputX = stick.x;
+                inputZ = stick.y;
+            }
+        }
 
         Vector3 targetDirection = new Vector3(inputX, 0f, inputZ).normalized;
         Vector3 targetVelocity = targetDirection * moveSpeed;
@@ -39,27 +65,11 @@ public class PlayerController : MonoBehaviour
         float rate = (targetDirection.magnitude > 0.01f) ? acceleration : deceleration;
         currentVelocity = Vector3.MoveTowards(currentVelocity, targetVelocity, rate * Time.deltaTime);
 
-        controller.Move(currentVelocity * Time.deltaTime);
-    }
-
-    private void HandleMouseAim()
-    {
-        if (mainCamera == null) return;
-
-        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        Plane groundPlane = new Plane(Vector3.up, new Vector3(0, transform.position.y, 0));
-
-        if (groundPlane.Raycast(ray, out float enterDistance))
+        // Rotate toward movement direction if moving
+        if (targetDirection.sqrMagnitude > 0.01f)
         {
-            Vector3 hitPoint = ray.GetPoint(enterDistance);
-            Vector3 lookDirection = hitPoint - transform.position;
-            lookDirection.y = 0;
-
-            if (lookDirection.sqrMagnitude > 0.001f)
-            {
-                Quaternion targetRotation = Quaternion.LookRotation(lookDirection);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-            }
+            Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
     }
 
@@ -71,7 +81,6 @@ public class PlayerController : MonoBehaviour
         }
 
         verticalVelocity.y += gravity * Time.deltaTime;
-        controller.Move(verticalVelocity * Time.deltaTime);
     }
 
     public void ApplyAttackLunge(Vector3 lungeVector)

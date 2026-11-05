@@ -1,9 +1,11 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.VFX;
+using UnityEngine.InputSystem; // Required for the New Input System
+using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerController))]
-public class PlayerCombat : MonoBehaviour
+public class PlayerCombat : NetworkBehaviour
 {
     [Header("Weapon Profile Data")]
     [SerializeField] private WeaponData currentWeapon;
@@ -12,7 +14,7 @@ public class PlayerCombat : MonoBehaviour
     [SerializeField] private Transform swordTransform;
     [SerializeField] private Transform shieldTransform;
 
-    [Header("VFX GameObjects")]
+    [Header("VFX GameObjects (Drag Slash_2 & Shield VFX here)")]
     [SerializeField] private GameObject swordSlashVfx;
     [SerializeField] private GameObject shieldBashVfx;
 
@@ -27,72 +29,94 @@ public class PlayerCombat : MonoBehaviour
 
     private void Update()
     {
+        // Allow if we own this object, or if testing locally without a network manager running
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && !IsOwner)
+            return;
+
         if (m1Timer > 0f) m1Timer -= Time.deltaTime;
         if (m2Timer > 0f) m2Timer -= Time.deltaTime;
 
-        if (Input.GetMouseButton(0) && m1Timer <= 0f)
+        // New Input System mouse checks
+        bool leftClick = Mouse.current != null && Mouse.current.leftButton.isPressed;
+        bool rightClick = Mouse.current != null && Mouse.current.rightButton.isPressed;
+
+        if (leftClick && m1Timer <= 0f)
         {
-            ExecuteLightAttack();
+            m1Timer = currentWeapon != null ? currentWeapon.m1Cooldown : 0.5f;
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                SubmitAttackRequestServerRpc(true);
+            }
+            else
+            {
+                TriggerAttackClientRpc(true); // Local fallback
+            }
         }
-        else if (Input.GetMouseButton(1) && m2Timer <= 0f)
+        else if (rightClick && m2Timer <= 0f)
         {
-            ExecuteHeavyAttack();
+            m2Timer = currentWeapon != null ? currentWeapon.m2Cooldown : 0.5f;
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                SubmitAttackRequestServerRpc(false);
+            }
+            else
+            {
+                TriggerAttackClientRpc(false); // Local fallback
+            }
         }
     }
 
-    private void ExecuteLightAttack()
+    [ServerRpc]
+    private void SubmitAttackRequestServerRpc(bool isLightAttack)
     {
-        if (currentWeapon == null) return;
-
-        m1Timer = currentWeapon.m1Cooldown;
-
-        // Force reset and play all particle systems on the sword slash object
-        PlayVfxObject(swordSlashVfx);
-
-        StartCoroutine(PerformMovingAttack(
-            currentWeapon.m1ForwardLunge,
-            currentWeapon.m1HitboxOffset,
-            currentWeapon.m1HitboxSize,
-            currentWeapon.m1Damage,
-            currentWeapon.m1KnockbackForce
-        ));
+        TriggerAttackClientRpc(isLightAttack);
     }
 
-    private void ExecuteHeavyAttack()
+    [ClientRpc]
+    private void TriggerAttackClientRpc(bool isLightAttack)
     {
         if (currentWeapon == null) return;
 
-        m2Timer = currentWeapon.m2Cooldown;
-
-        // Force reset and play all particle systems on the shield bash object
-        PlayVfxObject(shieldBashVfx);
-
-        StartCoroutine(PerformMovingAttack(
-            currentWeapon.m2ForwardLunge,
-            currentWeapon.m2HitboxOffset,
-            currentWeapon.m2HitboxSize,
-            currentWeapon.m2Damage,
-            currentWeapon.m2KnockbackForce
-        ));
+        if (isLightAttack)
+        {
+            PlayVfxObject(swordSlashVfx);
+            StartCoroutine(PerformMovingAttack(
+                currentWeapon.m1ForwardLunge,
+                currentWeapon.m1HitboxOffset,
+                currentWeapon.m1HitboxSize,
+                currentWeapon.m1Damage,
+                currentWeapon.m1KnockbackForce
+            ));
+        }
+        else
+        {
+            PlayVfxObject(shieldBashVfx);
+            StartCoroutine(PerformMovingAttack(
+                currentWeapon.m2ForwardLunge,
+                currentWeapon.m2HitboxOffset,
+                currentWeapon.m2HitboxSize,
+                currentWeapon.m2Damage,
+                currentWeapon.m2KnockbackForce
+            ));
+        }
     }
 
     private void PlayVfxObject(GameObject vfxObj)
     {
         if (vfxObj == null) return;
 
-        // Ensure the GameObject is active
         vfxObj.SetActive(true);
 
-        // Check for a Visual Effect Graph component
         VisualEffect vfxGraph = vfxObj.GetComponentInChildren<VisualEffect>(true);
         if (vfxGraph != null)
         {
             vfxGraph.Reinit();
-            vfxGraph.SendEvent("OnPlay"); // Standard default event name for VFX graphs
+            vfxGraph.SendEvent("OnPlay");
             return;
         }
 
-        // Fallback: regular particle systems just in case
         ParticleSystem[] particleSystems = vfxObj.GetComponentsInChildren<ParticleSystem>(true);
         foreach (ParticleSystem ps in particleSystems)
         {
@@ -104,6 +128,7 @@ public class PlayerCombat : MonoBehaviour
             ps.Play(true);
         }
     }
+
     private IEnumerator PerformMovingAttack(float lungeForce, Vector3 offset, Vector3 size, float damage, float knockback)
     {
         float attackDuration = 0.1f;

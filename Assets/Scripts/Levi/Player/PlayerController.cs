@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.InputSystem; // Required for New Input System
+using UnityEngine.InputSystem;
 using Unity.Netcode;
 
 [RequireComponent(typeof(CharacterController))]
@@ -21,11 +21,28 @@ public class PlayerController : NetworkBehaviour
         controller = GetComponent<CharacterController>();
     }
 
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        // If Netcode is active, explicitly configure components based on ownership
+        if (IsServer || IsClient)
+        {
+            if (!IsOwner)
+            {
+                // Disable CharacterController on remote players so they don't block physics
+                if (controller != null) controller.enabled = false;
+            }
+        }
+    }
+
     private void Update()
     {
-        // Allow input if we own this object, or if testing locally without a network manager running
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && !IsOwner)
-            return;
+        // Strict guard: Only process movement if we own this character object
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            if (!IsOwner) return;
+        }
 
         HandleMovement();
         HandleGravity();
@@ -39,7 +56,6 @@ public class PlayerController : NetworkBehaviour
         float inputX = 0f;
         float inputZ = 0f;
 
-        // Read Keyboard Input (WASD / Arrows)
         if (Keyboard.current != null)
         {
             if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) inputX -= 1f;
@@ -48,7 +64,6 @@ public class PlayerController : NetworkBehaviour
             if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) inputZ += 1f;
         }
 
-        // Read Gamepad Left Stick Input (if connected)
         if (Gamepad.current != null)
         {
             Vector2 stick = Gamepad.current.leftStick.ReadValue();
@@ -65,7 +80,6 @@ public class PlayerController : NetworkBehaviour
         float rate = (targetDirection.magnitude > 0.01f) ? acceleration : deceleration;
         currentVelocity = Vector3.MoveTowards(currentVelocity, targetVelocity, rate * Time.deltaTime);
 
-        // Rotate toward movement direction if moving
         if (targetDirection.sqrMagnitude > 0.01f)
         {
             Quaternion targetRotation = Quaternion.LookRotation(targetDirection);
@@ -75,7 +89,7 @@ public class PlayerController : NetworkBehaviour
 
     private void HandleGravity()
     {
-        if (controller.isGrounded && verticalVelocity.y < 0)
+        if (controller.enabled && controller.isGrounded && verticalVelocity.y < 0)
         {
             verticalVelocity.y = -2f;
         }

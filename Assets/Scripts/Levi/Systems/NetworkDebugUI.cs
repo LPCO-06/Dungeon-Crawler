@@ -5,12 +5,14 @@ public class NetworkDebugUI : MonoBehaviour
 {
     private void OnGUI()
     {
+        // Safety check: If NetworkManager doesn't exist in the scene yet, don't run GUI logic
+        if (NetworkManager.Singleton == null) return;
+
         // Only show buttons if we aren't already connected/listening
         if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
         {
             GUILayout.BeginArea(new Rect(20, 20, 250, 150));
 
-            // GUI Box for styling
             GUILayout.BeginVertical("box");
 
             GUILayout.Label("<b>Multiplayer Controls</b>", new GUIStyle(GUI.skin.label) { richText = true });
@@ -35,7 +37,6 @@ public class NetworkDebugUI : MonoBehaviour
         }
         else
         {
-            // Show connection status on screen once active
             GUILayout.BeginArea(new Rect(20, 20, 200, 60));
             GUILayout.BeginVertical("box");
 

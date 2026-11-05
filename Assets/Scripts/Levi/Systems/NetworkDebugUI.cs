@@ -3,33 +3,63 @@ using Unity.Netcode;
 
 public class NetworkDebugUI : MonoBehaviour
 {
+    private string inputJoinCode = "";
+    private RelayManager relayManager;
+
+    private void Start()
+    {
+        // Zoek automatisch de RelayManager in de scène
+        relayManager = FindObjectOfType<RelayManager>();
+        if (relayManager == null)
+        {
+            Debug.LogWarning("Geen RelayManager gevonden in de scène! Zorg ervoor dat deze op een GameObject staat.");
+        }
+    }
+
     private void OnGUI()
     {
-        // Safety check: If NetworkManager doesn't exist in the scene yet, don't run GUI logic
         if (NetworkManager.Singleton == null) return;
 
-        // Only show buttons if we aren't already connected/listening
+        // Toon menu alleen als we nog niet verbonden/actief zijn
         if (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
         {
-            GUILayout.BeginArea(new Rect(20, 20, 250, 150));
-
+            GUILayout.BeginArea(new Rect(20, 20, 300, 230));
             GUILayout.BeginVertical("box");
 
-            GUILayout.Label("<b>Multiplayer Controls</b>", new GUIStyle(GUI.skin.label) { richText = true });
+            GUILayout.Label("<b>Unity Relay Multiplayer Menu</b>", new GUIStyle(GUI.skin.label) { richText = true });
 
-            if (GUILayout.Button("Start Host (Player 1)", GUILayout.Height(30)))
+            if (GUILayout.Button("Start Relay Host", GUILayout.Height(35)))
             {
-                NetworkManager.Singleton.StartHost();
+                if (relayManager != null)
+                {
+                    relayManager.InitializeAndStartHost();
+                }
+                else
+                {
+                    // Fallback naar gewone host als RelayManager ontbreekt
+                    NetworkManager.Singleton.StartHost();
+                }
             }
 
-            if (GUILayout.Button("Start Client (Player 2)", GUILayout.Height(30)))
-            {
-                NetworkManager.Singleton.StartClient();
-            }
+            GUILayout.Space(15);
+            GUILayout.Label("<b>Join via Join Code:</b>");
 
-            if (GUILayout.Button("Start Server (Dedicated)", GUILayout.Height(30)))
+            // Invoerveld voor de Relay Join Code
+            inputJoinCode = GUILayout.TextField(inputJoinCode, 10, GUILayout.Height(30));
+
+            if (GUILayout.Button("Connect as Client", GUILayout.Height(35)))
             {
-                NetworkManager.Singleton.StartServer();
+                if (!string.IsNullOrEmpty(inputJoinCode))
+                {
+                    if (relayManager != null)
+                    {
+                        relayManager.JoinWithCode(inputJoinCode.ToUpper());
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("Voer eerst een geldige Join Code in!");
+                }
             }
 
             GUILayout.EndVertical();
@@ -37,13 +67,19 @@ public class NetworkDebugUI : MonoBehaviour
         }
         else
         {
-            GUILayout.BeginArea(new Rect(20, 20, 200, 60));
+            // Status scherm wanneer je wel verbonden bent
+            GUILayout.BeginArea(new Rect(20, 20, 240, 80));
             GUILayout.BeginVertical("box");
 
-            string status = NetworkManager.Singleton.IsHost ? "Hosting" : (NetworkManager.Singleton.IsServer ? "Server" : "Connected Client");
+            string status = NetworkManager.Singleton.IsHost ? "Hosting (Relay)" : "Verbonden Client";
             GUILayout.Label($"<b>Status:</b> {status}", new GUIStyle(GUI.skin.label) { richText = true });
 
-            if (GUILayout.Button("Disconnect", GUILayout.Height(25)))
+            if (NetworkManager.Singleton.IsHost)
+            {
+                GUILayout.Label("<color=green>Kijk in de console voor je Join Code!</color>", new GUIStyle(GUI.skin.label) { richText = true, fontSize = 10 });
+            }
+
+            if (GUILayout.Button("Verbinding verbreken", GUILayout.Height(25)))
             {
                 NetworkManager.Singleton.Shutdown();
             }

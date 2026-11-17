@@ -19,7 +19,7 @@ GameObject:
   - component: {fileID: 6961126647314638614}
   m_Layer: 3
   m_Name: Enemy
-  m_TagString: Enemy
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -150,7 +150,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   role: 0
-  target: {fileID: 353545771598880799, guid: 0fc0f3b3233cbc2479caa796f2e4de6c, type: 3}
+  target: {fileID: 0}
   knockbackImmune: 0
   aggroRange: 15
   rotationSpeed: 10

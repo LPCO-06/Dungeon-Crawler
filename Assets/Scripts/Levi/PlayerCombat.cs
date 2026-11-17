@@ -1,10 +1,10 @@
+using PurrNet;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class PlayerCombat : MonoBehaviour
+public class PlayerCombat : NetworkBehaviour
 {
     [Header("Target Detection")]
-    [Tooltip("Select the Layer(s) assigned to your Enemy prefabs.")]
     [SerializeField] private LayerMask enemyLayers;
 
     [Header("Input Action References")]
@@ -19,20 +19,27 @@ public class PlayerCombat : MonoBehaviour
     private AbilitySO[] abilities = new AbilitySO[4];
     private float[] cooldownTimers = new float[4];
 
-    private void OnEnable()
+    protected override void OnSpawned()
     {
+        base.OnSpawned();
+        if (!isOwner) return;
+
         EnableAction(primaryAction);
         EnableAction(secondaryAction);
         EnableAction(skill1Action);
         EnableAction(skill2Action);
     }
 
-    private void OnDisable()
+    protected override void OnDespawned()
     {
-        DisableAction(primaryAction);
-        DisableAction(secondaryAction);
-        DisableAction(skill1Action);
-        DisableAction(skill2Action);
+        if (isOwner)
+        {
+            DisableAction(primaryAction);
+            DisableAction(secondaryAction);
+            DisableAction(skill1Action);
+            DisableAction(skill2Action);
+        }
+        base.OnDespawned();
     }
 
     private void EnableAction(InputActionReference actionRef)
@@ -68,6 +75,8 @@ public class PlayerCombat : MonoBehaviour
             }
         }
 
+        if (!isOwner) return;
+
         if (IsTriggered(primaryAction)) TryUseAbility(0);
         if (IsTriggered(secondaryAction)) TryUseAbility(1);
         if (IsTriggered(skill1Action)) TryUseAbility(2);
@@ -84,8 +93,21 @@ public class PlayerCombat : MonoBehaviour
         AbilitySO ability = abilities[slotIndex];
         if (ability == null || cooldownTimers[slotIndex] > 0f) return;
 
-        ability.Activate(transform, enemyLayers);
         cooldownTimers[slotIndex] = ability.cooldown;
+        RequestUseAbilityServerRpc(slotIndex, transform.position, transform.rotation);
+    }
+
+    [ServerRpc]
+    private void RequestUseAbilityServerRpc(int slotIndex, Vector3 castPosition, Quaternion castRotation)
+    {
+        if (slotIndex < 0 || slotIndex >= abilities.Length) return;
+
+        AbilitySO ability = abilities[slotIndex];
+        if (ability == null) return;
+
+        // Sync transform position/rotation on server before activating hitbox/projectile
+        transform.SetPositionAndRotation(castPosition, castRotation);
+        ability.Activate(transform, enemyLayers);
     }
 
     private void OnDrawGizmosSelected()
@@ -94,7 +116,6 @@ public class PlayerCombat : MonoBehaviour
 
         Color[] slotColors = { Color.cyan, Color.green, Color.yellow, Color.magenta };
 
-        // In Play Mode, draw the currently equipped runtime abilities
         if (Application.isPlaying)
         {
             for (int i = 0; i < abilities.Length; i++)
@@ -105,7 +126,6 @@ public class PlayerCombat : MonoBehaviour
                 }
             }
         }
-        // In Edit Mode, preview the Starting Class assigned to PlayerClassManager
         else if (TryGetComponent<PlayerClassManager>(out PlayerClassManager classManager) && classManager.StartingClass != null)
         {
             PlayerClassSO previewClass = classManager.StartingClass;

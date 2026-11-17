@@ -1,6 +1,7 @@
-﻿using UnityEngine;
+﻿using PurrNet;
+using UnityEngine;
 
-public class SimpleProjectile : MonoBehaviour
+public class SimpleProjectile : NetworkBehaviour
 {
     [SerializeField] private float lifetime = 3f;
 
@@ -8,6 +9,8 @@ public class SimpleProjectile : MonoBehaviour
     private float speed;
     private float knockbackForce;
     private LayerMask targetLayers;
+    private float lifeTimer;
+    private bool initialized;
 
     public void Initialize(float dmg, float spd, float knockback, LayerMask layers)
     {
@@ -15,16 +18,27 @@ public class SimpleProjectile : MonoBehaviour
         speed = spd;
         knockbackForce = knockback;
         targetLayers = layers;
-        Destroy(gameObject, lifetime);
+        lifeTimer = lifetime;
+        initialized = true;
     }
 
     private void Update()
     {
+        if (!isServer || !initialized) return;
+
         transform.position += transform.forward * (speed * Time.deltaTime);
+
+        lifeTimer -= Time.deltaTime;
+        if (lifeTimer <= 0f)
+        {
+            Despawn();
+        }
     }
 
     private void OnTriggerEnter(Collider other)
     {
+        if (!isServer || !initialized) return;
+
         if (((1 << other.gameObject.layer) & targetLayers) != 0)
         {
             if (other.TryGetComponent<Health>(out Health health))
@@ -37,11 +51,11 @@ public class SimpleProjectile : MonoBehaviour
                 receiver.ApplyKnockback(transform.forward, knockbackForce);
             }
 
-            Destroy(gameObject);
+            Despawn();
         }
         else if (!other.isTrigger && !other.CompareTag("Player"))
         {
-            Destroy(gameObject);
+            Despawn();
         }
     }
 }

@@ -1,8 +1,9 @@
+using PurrNet;
 using UnityEngine;
 using UnityEngine.AI;
 
 [RequireComponent(typeof(NavMeshAgent), typeof(KnockbackReceiver))]
-public class EnemyMovementAI : MonoBehaviour
+public class EnemyMovementAI : NetworkBehaviour
 {
     public enum EnemyRole
     {
@@ -16,23 +17,15 @@ public class EnemyMovementAI : MonoBehaviour
     [SerializeField] private Transform target;
 
     [Header("Knockback Settings")]
-    [Tooltip("Toggle knockback immunity for this enemy (e.g., Heavy Melee brutes or bosses).")]
     [SerializeField] private bool knockbackImmune = false;
 
     [Header("Detection & Engagement")]
-    [Tooltip("Maximum distance at which the enemy notices and tracks the player.")]
     [SerializeField] private float aggroRange = 15f;
-    [Tooltip("How fast the enemy rotates to face the player.")]
     [SerializeField] private float rotationSpeed = 10f;
 
     [Header("Role Spacing Settings")]
-    [Tooltip("Heavy Melee: Closes in until this distance.")]
     [SerializeField] private float heavyStopDistance = 1.5f;
-
-    [Tooltip("Light Melee: Preferred combat range (min = retreat threshold, max = advance threshold).")]
     [SerializeField] private Vector2 lightMeleeRange = new Vector2(2.2f, 3.5f);
-
-    [Tooltip("Ranged: Preferred firing zone (min = kite backward threshold, max = advance threshold).")]
     [SerializeField] private Vector2 rangedCombatRange = new Vector2(7.0f, 10.5f);
 
     [Header("Movement Speeds")]
@@ -41,6 +34,8 @@ public class EnemyMovementAI : MonoBehaviour
 
     private NavMeshAgent agent;
     private KnockbackReceiver knockbackReceiver;
+
+    public Transform CurrentTarget => target;
 
     private void Awake()
     {
@@ -51,36 +46,37 @@ public class EnemyMovementAI : MonoBehaviour
         knockbackReceiver.IsKnockbackImmune = knockbackImmune;
     }
 
+    protected override void OnSpawned()
+    {
+        base.OnSpawned();
+        // Disable NavMeshAgent on non-host clients so NetworkTransform drives position cleanly
+        if (!isServer && agent != null)
+        {
+            agent.enabled = false;
+        }
+    }
+
     private void OnValidate()
     {
-        // Keeps KnockbackReceiver synced when toggling the checkbox in the Inspector
         if (TryGetComponent<KnockbackReceiver>(out KnockbackReceiver receiver))
         {
             receiver.IsKnockbackImmune = knockbackImmune;
         }
     }
 
-    private void Start()
-    {
-        if (target == null)
-        {
-            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null) target = playerObj.transform;
-        }
-    }
-
     private void Update()
     {
-        // Keep immunity synced if changed at runtime
+        if (!isServer) return;
+
         knockbackReceiver.IsKnockbackImmune = knockbackImmune;
 
-        // Pause AI steering while actively sliding from a knockback hit
         if (knockbackReceiver.IsKnockedBack)
         {
             if (agent.hasPath) agent.ResetPath();
             return;
         }
 
+        FindClosestLivingPlayer();
         if (target == null) return;
 
         float distanceToPlayer = Vector3.Distance(transform.position, target.position);
@@ -98,15 +94,35 @@ public class EnemyMovementAI : MonoBehaviour
             case EnemyRole.HeavyMelee:
                 HandleHeavyMelee(distanceToPlayer);
                 break;
-
             case EnemyRole.LightMelee:
                 HandleSpacingMovement(distanceToPlayer, lightMeleeRange.x, lightMeleeRange.y);
                 break;
-
             case EnemyRole.Ranged:
                 HandleSpacingMovement(distanceToPlayer, rangedCombatRange.x, rangedCombatRange.y);
                 break;
         }
+    }
+
+    private void FindClosestLivingPlayer()
+    {
+        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+        Transform closest = null;
+        float closestDistSqr = Mathf.Infinity;
+
+        foreach (GameObject playerObj in players)
+        {
+            if (playerObj.TryGetComponent<Health>(out Health playerHealth) && playerHealth.IsDead)
+                continue;
+
+            float distSqr = (playerObj.transform.position - transform.position).sqrMagnitude;
+            if (distSqr < closestDistSqr)
+            {
+                closestDistSqr = distSqr;
+                closest = playerObj.transform;
+            }
+        }
+
+        target = closest;
     }
 
     private void HandleHeavyMelee(float distance)

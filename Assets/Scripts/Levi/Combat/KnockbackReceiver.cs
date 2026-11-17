@@ -1,13 +1,11 @@
+using PurrNet;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class KnockbackReceiver : MonoBehaviour
+public class KnockbackReceiver : NetworkBehaviour
 {
     [Header("Knockback Settings")]
-    [Tooltip("If true, this entity ignores all incoming knockback forces.")]
     [SerializeField] private bool isKnockbackImmune = false;
-
-    [Tooltip("How quickly the knockback slide slows down to a stop.")]
     [SerializeField] private float drag = 12f;
 
     private NavMeshAgent agent;
@@ -20,9 +18,6 @@ public class KnockbackReceiver : MonoBehaviour
         set => isKnockbackImmune = value;
     }
 
-    /// <summary>
-    /// True while the entity is actively being pushed back.
-    /// </summary>
     public bool IsKnockedBack => impactVelocity.sqrMagnitude > 0.05f;
 
     private void Awake()
@@ -32,16 +27,24 @@ public class KnockbackReceiver : MonoBehaviour
     }
 
     /// <summary>
-    /// Applies a horizontal knockback impulse in the given direction.
+    /// Call this on the Server; broadcasts the knockback impulse so both Server NavMeshAgents
+    /// and Owner-Authoritative Players slide smoothly.
     /// </summary>
     public void ApplyKnockback(Vector3 direction, float force)
     {
-        if (isKnockbackImmune || force <= 0f) return;
+        if (!isServer || isKnockbackImmune || force <= 0f) return;
 
         direction.y = 0f;
         if (direction.sqrMagnitude < 0.001f) return;
 
-        impactVelocity = direction.normalized * force;
+        ApplyKnockbackRpc(direction.normalized, force);
+    }
+
+    [ObserversRpc]
+    private void ApplyKnockbackRpc(Vector3 normalizedDir, float force)
+    {
+        if (isKnockbackImmune) return;
+        impactVelocity = normalizedDir * force;
     }
 
     private void Update()
@@ -54,22 +57,15 @@ public class KnockbackReceiver : MonoBehaviour
 
         Vector3 displacement = impactVelocity * Time.deltaTime;
 
-        // Move using whichever movement component is attached
-        if (agent != null && agent.enabled)
+        if (agent != null && agent.enabled && isServer)
         {
-            // NavMeshAgent.Move automatically slides along walls without leaving the NavMesh
             agent.Move(displacement);
         }
-        else if (characterController != null && characterController.enabled)
+        else if (characterController != null && characterController.enabled && isOwner)
         {
             characterController.Move(displacement);
         }
-        else
-        {
-            transform.position += displacement;
-        }
 
-        // Smoothly damp the knockback velocity back to zero
         impactVelocity = Vector3.Lerp(impactVelocity, Vector3.zero, drag * Time.deltaTime);
     }
 }

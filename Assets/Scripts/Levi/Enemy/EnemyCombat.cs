@@ -1,27 +1,23 @@
 using System.Collections;
+using PurrNet;
 using UnityEngine;
 
 [RequireComponent(typeof(EnemyMovementAI))]
-public class EnemyCombat : MonoBehaviour
+public class EnemyCombat : NetworkBehaviour
 {
     [Header("Attack Configuration")]
-    [Tooltip("Assign any AbilitySO (MeleeArc, AreaAroundSelf, or Projectile).")]
     [SerializeField] private AbilitySO enemyAttack;
-    [Tooltip("Select the Layer(s) assigned to the Player.")]
     [SerializeField] private LayerMask targetLayers;
-    [Tooltip("Maximum distance at which the enemy will initiate an attack.")]
     [SerializeField] private float attackRange = 2.5f;
 
     [Header("Timing & Telegraph")]
-    [Tooltip("Brief pause before the attack lands so the player can react.")]
     [SerializeField] private float attackWindup = 0.35f;
-    [Tooltip("Time between attacks (overrides or adds to AbilitySO cooldown).")]
     [SerializeField] private float attackInterval = 1.5f;
 
     [Header("Debug")]
     [SerializeField] private bool showAttackGizmo = true;
 
-    private Transform target;
+    private EnemyMovementAI movementAI;
     private KnockbackReceiver knockbackReceiver;
     private float cooldownTimer;
     private bool isAttacking;
@@ -30,31 +26,25 @@ public class EnemyCombat : MonoBehaviour
 
     private void Awake()
     {
+        movementAI = GetComponent<EnemyMovementAI>();
         knockbackReceiver = GetComponent<KnockbackReceiver>();
-    }
-
-    private void Start()
-    {
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-        {
-            target = playerObj.transform;
-        }
     }
 
     private void Update()
     {
+        if (!isServer) return;
+
         if (cooldownTimer > 0f)
         {
             cooldownTimer -= Time.deltaTime;
         }
 
+        Transform target = movementAI.CurrentTarget;
         if (target == null || enemyAttack == null || isAttacking || cooldownTimer > 0f)
         {
             return;
         }
 
-        // Don't start an attack while being knocked back
         if (knockbackReceiver != null && knockbackReceiver.IsKnockedBack)
         {
             return;
@@ -72,10 +62,8 @@ public class EnemyCombat : MonoBehaviour
     {
         isAttacking = true;
 
-        // Wind-up delay (hook up an animation trigger or color flash here later!)
         yield return new WaitForSeconds(attackWindup);
 
-        // Cancel if knocked back mid-windup (unless immune)
         if (knockbackReceiver == null || !knockbackReceiver.IsKnockedBack)
         {
             enemyAttack.Activate(transform, targetLayers);
@@ -89,11 +77,9 @@ public class EnemyCombat : MonoBehaviour
     {
         if (!showAttackGizmo) return;
 
-        // Draw engagement trigger range
         Gizmos.color = new Color(1f, 0.4f, 0f, 0.8f);
         Gizmos.DrawWireSphere(transform.position, attackRange);
 
-        // Draw the actual AbilitySO hitbox/trajectory
         if (enemyAttack != null)
         {
             enemyAttack.DrawGizmo(transform, Color.red);

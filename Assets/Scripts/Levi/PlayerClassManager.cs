@@ -1,16 +1,25 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using PurrNet;
+using UnityEngine;
 
 [RequireComponent(typeof(Health), typeof(PlayerController), typeof(PlayerCombat))]
-public class PlayerClassManager : MonoBehaviour
+public class PlayerClassManager : NetworkBehaviour
 {
-    [Header("Active Class")]
-    [SerializeField] private PlayerClassSO startingClass;
+    [Header("Available Classes")]
+    [Tooltip("Assign all playable PlayerClassSO assets here so class indices sync across the network.")]
+    [SerializeField] private List<PlayerClassSO> availableClasses = new List<PlayerClassSO>();
+    [SerializeField] private int defaultClassIndex = 0;
+
+    private SyncVar<int> activeClassIndex = new SyncVar<int>(0);
 
     private Health health;
     private PlayerController controller;
     private PlayerCombat combat;
 
-    public PlayerClassSO StartingClass => startingClass;
+    public PlayerClassSO StartingClass => (availableClasses.Count > defaultClassIndex && defaultClassIndex >= 0)
+        ? availableClasses[defaultClassIndex]
+        : null;
+
     public PlayerClassSO CurrentClass { get; private set; }
 
     private void Awake()
@@ -20,23 +29,58 @@ public class PlayerClassManager : MonoBehaviour
         combat = GetComponent<PlayerCombat>();
     }
 
-    private void Start()
+    protected override void OnSpawned()
     {
-        if (startingClass != null)
+        base.OnSpawned();
+        activeClassIndex.onChanged += OnClassIndexChanged;
+
+        if (isServer)
         {
-            ApplyClass(startingClass);
+            activeClassIndex.value = defaultClassIndex;
+        }
+
+        ApplyClassByIndex(activeClassIndex.value);
+    }
+
+    protected override void OnDespawned()
+    {
+        activeClassIndex.onChanged -= OnClassIndexChanged;
+        base.OnDespawned();
+    }
+
+    private void OnClassIndexChanged(int newIndex)
+    {
+        ApplyClassByIndex(newIndex);
+    }
+
+    /// <summary>
+    /// Call this from your Class Selection UI on the local player.
+    /// </summary>
+    public void RequestClassChange(int classIndex)
+    {
+        if (!isOwner) return;
+        SetClassServerRpc(classIndex);
+    }
+
+    [ServerRpc]
+    private void SetClassServerRpc(int classIndex)
+    {
+        if (classIndex >= 0 && classIndex < availableClasses.Count)
+        {
+            activeClassIndex.value = classIndex;
         }
     }
 
-    public void ApplyClass(PlayerClassSO newClass)
+    private void ApplyClassByIndex(int index)
     {
-        if (newClass == null) return;
+        if (index < 0 || index >= availableClasses.Count) return;
 
-        CurrentClass = newClass;
-        health.InitializeHealth(newClass.maxHealth);
-        controller.SetMoveSpeed(newClass.moveSpeed);
-        combat.EquipClassAbilities(newClass);
+        PlayerClassSO chosenClass = availableClasses[index];
+        if (chosenClass == null) return;
 
-        Debug.Log($"Equipped Class: {newClass.className} (HP: {newClass.maxHealth}, Speed: {newClass.moveSpeed})");
+        CurrentClass = chosenClass;
+        health.InitializeHealth(chosenClass.maxHealth);
+        controller.SetMoveSpeed(chosenClass.moveSpeed);
+        combat.EquipClassAbilities(chosenClass);
     }
 }

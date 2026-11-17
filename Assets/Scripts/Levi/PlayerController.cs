@@ -1,8 +1,9 @@
+using PurrNet;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerController : MonoBehaviour
+public class PlayerController : NetworkBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 6f;
@@ -26,19 +27,26 @@ public class PlayerController : MonoBehaviour
         controller = GetComponent<CharacterController>();
     }
 
-    private void OnEnable()
+    protected override void OnSpawned()
     {
-        if (moveActionReference != null) moveActionReference.action.Enable();
+        base.OnSpawned();
+
+        // Only enable input for the local owner of this player object
+        if (isOwner && moveActionReference != null)
+        {
+            moveActionReference.action.Enable();
+        }
     }
 
-    private void OnDisable()
+    protected override void OnDespawned()
     {
-        if (moveActionReference != null) moveActionReference.action.Disable();
+        if (isOwner && moveActionReference != null)
+        {
+            moveActionReference.action.Disable();
+        }
+        base.OnDespawned();
     }
 
-    /// <summary>
-    /// Overrides movement speed dynamically when equipping a class.
-    /// </summary>
     public void SetMoveSpeed(float newSpeed)
     {
         moveSpeed = newSpeed;
@@ -46,6 +54,9 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        // Crucial: Only the owning client simulates movement; NetworkTransform syncs it to others
+        if (!isOwner) return;
+
         GatherInput();
         HandleMovement();
     }

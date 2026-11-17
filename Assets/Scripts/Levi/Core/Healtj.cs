@@ -1,49 +1,78 @@
+using PurrNet;
 using UnityEngine;
 using UnityEngine.Events;
 
-public class Health : MonoBehaviour
+public class Health : NetworkBehaviour
 {
     [Header("Health Settings")]
     [SerializeField] private float maxHealth = 100f;
-    private float currentHealth;
+
+    // SyncVar automatically synchronizes health & death state from Server to all Clients
+    private SyncVar<float> currentHealth = new SyncVar<float>(100f);
+    private SyncVar<bool> isDead = new SyncVar<bool>(false);
 
     [Header("Events")]
     public UnityEvent<float, float> onHealthChanged;
     public UnityEvent onDeath;
 
-    [Header("Debug")]
-    [SerializeField] private bool isDead = false;
-
-    public float CurrentHealth => currentHealth;
+    public float CurrentHealth => currentHealth.value;
     public float MaxHealth => maxHealth;
-    public bool IsDead => isDead;
+    public bool IsDead => isDead.value;
 
-    private void Awake()
+    protected override void OnSpawned()
     {
-        currentHealth = maxHealth;
+        base.OnSpawned();
+
+        // Subscribe to SyncVar changes so UI/visuals update on every client
+        currentHealth.onChanged += HandleHealthChanged;
+        isDead.onChanged += HandleDeathChanged;
+
+        if (isServer)
+        {
+            currentHealth.value = maxHealth;
+            isDead.value = false;
+        }
     }
 
-    /// <summary>
-    /// Sets a new max health (e.g., from a Player Class) and resets current health.
-    /// </summary>
+    protected override void OnDespawned()
+    {
+        currentHealth.onChanged -= HandleHealthChanged;
+        isDead.onChanged -= HandleDeathChanged;
+        base.OnDespawned();
+    }
+
+    private void HandleHealthChanged(float newHealth)
+    {
+        onHealthChanged?.Invoke(newHealth, maxHealth);
+    }
+
+    private void HandleDeathChanged(bool dead)
+    {
+        if (dead) onDeath?.Invoke();
+    }
+
     public void InitializeHealth(float newMaxHealth)
     {
         maxHealth = newMaxHealth;
-        currentHealth = maxHealth;
-        isDead = false;
-        onHealthChanged?.Invoke(currentHealth, maxHealth);
+        if (isServer)
+        {
+            currentHealth.value = maxHealth;
+            isDead.value = false;
+        }
     }
 
+    /// <summary>
+    /// Server-authoritative damage application.
+    /// </summary>
     public bool TakeDamage(float amount)
     {
-        if (isDead || amount <= 0f) return false;
+        if (!isServer || isDead.value || amount <= 0f) return false;
 
-        currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
-        onHealthChanged?.Invoke(currentHealth, maxHealth);
+        currentHealth.value = Mathf.Clamp(currentHealth.value - amount, 0f, maxHealth);
 
-        if (currentHealth <= 0f)
+        if (currentHealth.value <= 0f)
         {
-            Die();
+            isDead.value = true;
         }
 
         return true;
@@ -51,16 +80,8 @@ public class Health : MonoBehaviour
 
     public void Heal(float amount)
     {
-        if (isDead || amount <= 0f) return;
+        if (!isServer || isDead.value || amount <= 0f) return;
 
-        currentHealth = Mathf.Clamp(currentHealth + amount, 0f, maxHealth);
-        onHealthChanged?.Invoke(currentHealth, maxHealth);
-    }
-
-    private void Die()
-    {
-        if (isDead) return;
-        isDead = true;
-        onDeath?.Invoke();
+        currentHealth.value = Mathf.Clamp(currentHealth.value + amount, 0f, maxHealth);
     }
 }

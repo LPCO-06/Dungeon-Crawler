@@ -8,9 +8,9 @@ public class PlayerClassManager : NetworkBehaviour
     [Header("Available Classes")]
     [Tooltip("Assign all playable PlayerClassSO assets here so class indices sync across the network.")]
     [SerializeField] private List<PlayerClassSO> availableClasses = new List<PlayerClassSO>();
-    [SerializeField] private int defaultClassIndex = 0;
+    [SerializeField] private int defaultClassIndex = 1;
 
-    private SyncVar<int> activeClassIndex = new SyncVar<int>(0);
+    private SyncVar<int> activeClassIndex = new SyncVar<int>(1);
 
     private Health health;
     private PlayerController controller;
@@ -65,7 +65,7 @@ public class PlayerClassManager : NetworkBehaviour
     [ServerRpc]
     private void SetClassServerRpc(int classIndex)
     {
-        if (classIndex >= 0 && classIndex < availableClasses.Count)
+        if (classIndex >= 1 && classIndex < availableClasses.Count)
         {
             activeClassIndex.value = classIndex;
         }
@@ -73,7 +73,7 @@ public class PlayerClassManager : NetworkBehaviour
 
     private void ApplyClassByIndex(int index)
     {
-        if (index < 0 || index >= availableClasses.Count) return;
+        if (index < 1 || index >= availableClasses.Count) return;
 
         PlayerClassSO chosenClass = availableClasses[index];
         if (chosenClass == null) return;

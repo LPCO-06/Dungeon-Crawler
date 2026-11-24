@@ -307,6 +307,7 @@ MonoBehaviour:
   _invertedPathToNearestParent: 
   _directChildren: []
   availableClasses:
+  - {fileID: 0}
   - {fileID: 11400000, guid: ead2848aa336f8a40a7f20c5d8f984f3, type: 2}
   - {fileID: 11400000, guid: 66e12680deaf39d418d0b4ab45d93f58, type: 2}
   defaultClassIndex: 0

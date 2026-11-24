@@ -1,4 +1,5 @@
 using PurrNet;
+using System;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -73,6 +74,7 @@ public class Health : NetworkBehaviour
         if (currentHealth.value <= 0f)
         {
             isDead.value = true;
+            Debug.Log($"{gameObject.name} has died.");
         }
 
         return true;

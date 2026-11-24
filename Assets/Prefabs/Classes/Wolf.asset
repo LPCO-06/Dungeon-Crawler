@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Wolf
   m_EditorClassIdentifier: 
   className: Wolf
-  maxHealth: 1000
+  maxHealth: 20
   moveSpeed: 5.5
   primaryAttack: {fileID: 11400000, guid: a87978999aad81e46864545d697ba87b, type: 2}
   secondaryAttack: {fileID: 0}

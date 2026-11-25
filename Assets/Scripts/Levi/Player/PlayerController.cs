@@ -10,15 +10,18 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private float acceleration = 0.1f;
 
     [Header("Aiming Settings")]
-    [Tooltip("When enabled, the player rotates toward the mouse cursor on the ground plane instead of movement direction.")]
-    [SerializeField] private bool aimTowardMouse = true;
+    [Tooltip("When enabled, aims via mouse cursor or right analog stick depending on which was used last.")]
+    [SerializeField] private bool twinStickAiming = true;
     [SerializeField] private float rotationSpeed = 25f;
+    [SerializeField] private float stickAimDeadzone = 0.2f;
 
     [Header("Gravity")]
     [SerializeField] private float gravity = -9.81f;
 
-    [Header("Input Action Reference")]
+    [Header("Input Action References")]
     [SerializeField] private InputActionReference moveActionReference;
+    [Tooltip("Optional: Bind to Right Stick / Look (Vector2). If unassigned, falls back to Gamepad.current.rightStick.")]
+    [SerializeField] private InputActionReference lookActionReference;
 
     private CharacterController controller;
     private Camera mainCamera;
@@ -26,6 +29,9 @@ public class PlayerController : NetworkBehaviour
     private Vector2 smoothedInput;
     private Vector2 inputVelocity;
     private float verticalVelocity;
+
+    private bool usingGamepadAim;
+    private Vector3 lastGamepadAimDirection;
 
     private void Awake()
     {
@@ -39,18 +45,17 @@ public class PlayerController : NetworkBehaviour
         if (isOwner)
         {
             mainCamera = Camera.main;
-            if (moveActionReference != null)
-            {
-                moveActionReference.action.Enable();
-            }
+            if (moveActionReference != null) moveActionReference.action.Enable();
+            if (lookActionReference != null) lookActionReference.action.Enable();
         }
     }
 
     protected override void OnDespawned()
     {
-        if (isOwner && moveActionReference != null)
+        if (isOwner)
         {
-            moveActionReference.action.Disable();
+            if (moveActionReference != null) moveActionReference.action.Disable();
+            if (lookActionReference != null) lookActionReference.action.Disable();
         }
         base.OnDespawned();
     }
@@ -98,9 +103,9 @@ public class PlayerController : NetworkBehaviour
     {
         Vector3 targetLookDirection = Vector3.zero;
 
-        if (aimTowardMouse)
+        if (twinStickAiming)
         {
-            targetLookDirection = GetMouseAimDirection();
+            targetLookDirection = GetTwinStickAimDirection(moveDirection);
         }
         else if (moveDirection.sqrMagnitude > 0.001f)
         {
@@ -112,6 +117,55 @@ public class PlayerController : NetworkBehaviour
             Quaternion targetRotation = Quaternion.LookRotation(targetLookDirection, Vector3.up);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
+    }
+
+    private Vector3 GetTwinStickAimDirection(Vector3 moveDirection)
+    {
+        Vector2 stickInput = ReadRightStickInput();
+
+        // 1. If the player tilts the right stick past the deadzone, switch to gamepad aiming
+        if (stickInput.sqrMagnitude >= stickAimDeadzone * stickAimDeadzone)
+        {
+            usingGamepadAim = true;
+            lastGamepadAimDirection = new Vector3(stickInput.x, 0f, stickInput.y).normalized;
+            return lastGamepadAimDirection;
+        }
+
+        // 2. If the mouse physically moved this frame, switch back to mouse aiming
+        if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 1f)
+        {
+            usingGamepadAim = false;
+        }
+
+        // 3. Apply active device's aim
+        if (usingGamepadAim)
+        {
+            // Keep facing last aimed direction when stick returns to center (or face move direction if never aimed yet)
+            return lastGamepadAimDirection.sqrMagnitude > 0.001f ? lastGamepadAimDirection : moveDirection;
+        }
+
+        return GetMouseAimDirection();
+    }
+
+    private Vector2 ReadRightStickInput()
+    {
+        // Prefer the assigned InputActionReference if wired up in the Inspector
+        if (lookActionReference != null && lookActionReference.action != null)
+        {
+            // Ignore Mouse Delta if your Look action shares both Mouse Delta and Right Stick
+            if (lookActionReference.action.activeControl?.device is Gamepad)
+            {
+                return lookActionReference.action.ReadValue<Vector2>();
+            }
+        }
+
+        // Direct fallback to active Gamepad right stick so it works out of the box
+        if (Gamepad.current != null)
+        {
+            return Gamepad.current.rightStick.ReadValue();
+        }
+
+        return Vector2.zero;
     }
 
     private Vector3 GetMouseAimDirection()
@@ -127,7 +181,6 @@ public class PlayerController : NetworkBehaviour
         Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
         Ray ray = mainCamera.ScreenPointToRay(mouseScreenPos);
 
-        // Intersect a horizontal plane at the player's current Y height (works even over pits/edges)
         Plane aimPlane = new Plane(Vector3.up, new Vector3(0f, transform.position.y, 0f));
 
         if (aimPlane.Raycast(ray, out float enterDistance))
@@ -136,7 +189,6 @@ public class PlayerController : NetworkBehaviour
             Vector3 direction = hitPoint - transform.position;
             direction.y = 0f;
 
-            // Small deadzone prevents jitter if the cursor sits directly on the player's center
             if (direction.sqrMagnitude > 0.04f)
             {
                 return direction.normalized;

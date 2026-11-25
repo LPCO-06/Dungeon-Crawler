@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afbfd7871e2cf4548855293d038224c4, type: 3}
+  m_Name: RangedBulletAttack
+  m_EditorClassIdentifier: 
+  abilityName: Slash
+  attackType: 2
+  cooldown: 0.1
+  damage: 1
+  knockbackForce: 20
+  range: 2.5
+  hitAngle: 120
+  originOffset: {x: 0, y: 0.5, z: 0.5}
+  projectilePrefab: {fileID: 243842893384600092, guid: 58674617a31910344ab38bf4740a424f, type: 3}
+  projectileSpeed: 20
